@@ -4,7 +4,7 @@
 ######################################
 
 resource "aws_vpc" "main" {
-  cidr_block           = "10.10.0.0/16"
+  cidr_block           = var.vpc_cidr
   enable_dns_support   = true
   enable_dns_hostnames = true
   tags = {
@@ -16,59 +16,40 @@ resource "aws_vpc" "main" {
 ######################################
 # Private , Public 서브넷 구성
 ######################################
-resource "aws_subnet" "public1" {
+
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+resource "aws_subnet" "public" {
+  count = var.subnets_count
   vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.10.0.0/24"
-  availability_zone       = "ap-northeast-2a"
+  cidr_block              = "10.10.${count.index + 1}0.0/24"
+  availability_zone       = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true
   tags = {
-    Name = "AWS-public1-SN"
+    Name = "AWS-public${count.index + 1}-SN"
+    "kubernetes.io/role/elb" = 1
   }
 }
 
-resource "aws_subnet" "public2" {
-  vpc_id                  = aws_vpc.main.id
-  cidr_block              = "10.10.10.0/24"
-  availability_zone       = "ap-northeast-2b"
-  map_public_ip_on_launch = true
-  tags = {
-    Name = "AWS-public2-SN"
-  }
-}
-
-resource "aws_subnet" "private1" {
+resource "aws_subnet" "private" {
+  count = var.subnets_count
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.10.100.0/24"
-  availability_zone = "ap-northeast-2a"
+  cidr_block        = "10.10.1${count.index + 1}0.0/24"
+  availability_zone = data.aws_availability_zones.available.names[count.index]
   tags = {
-    Name = "AWS-private1-SN"
+    Name = "AWS-private${count.index + 1}-SN"
   }
 }
 
-resource "aws_subnet" "private2" {
+resource "aws_subnet" "db" {
+  count = var.subnets_count
   vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.10.110.0/24"
-  availability_zone = "ap-northeast-2b"
+  cidr_block        = "10.10.2${count.index + 1}0.0/24"
+  availability_zone = data.aws_availability_zones.available.names[count.index]
   tags = {
-    Name = "AWS-private2-SN"
-  }
-}
-
-resource "aws_subnet" "private3" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.10.120.0/24"
-  availability_zone = "ap-northeast-2a"
-  tags = {
-    Name = "AWS-private3-SN"
-  }
-}
-
-resource "aws_subnet" "private4" {
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = "10.10.130.0/24"
-  availability_zone = "ap-northeast-2b"
-  tags = {
-    Name = "AWS-private4-SN"
+    Name = "AWS-db${count.index + 1}-SN"
   }
 }
 
@@ -87,7 +68,7 @@ resource "aws_internet_gateway" "igw" {
 ######################################
 # 라우팅 테이블 생성 (Public)
 ######################################
-resource "aws_route_table" "public_rt" {
+resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   route {
@@ -101,47 +82,30 @@ resource "aws_route_table" "public_rt" {
 }
 
 resource "aws_route_table_association" "public1_association" {
-  subnet_id      = aws_subnet.public1.id
-  route_table_id = aws_route_table.public_rt.id
-}
-
-resource "aws_route_table_association" "public2_association" {
-  subnet_id      = aws_subnet.public2.id
-  route_table_id = aws_route_table.public_rt.id
+  count = var.subnets_count
+  subnet_id      = aws_subnet.public[count.index].id
+  route_table_id = aws_route_table.public.id
 }
 
 ######################################
 # 라우팅 테이블 생성 (Private)
 ######################################
-resource "aws_route_table" "private_rt" {
+resource "aws_route_table" "private" {
+  count = var.subnets_count
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "AWS-private-RT"
+    Name = "AWS-private${count.index + 1}-RT"
   }
 }
-resource "aws_route_table_association" "private1_association" {
-  subnet_id      = aws_subnet.private1.id
-  route_table_id = aws_route_table.private_rt.id
+resource "aws_route_table_association" "private_association" {
+  count = var.subnets_count
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private[count.index].id
 }
 
 
-resource "aws_route_table" "private2_rt" {
-  vpc_id = aws_vpc.main.id
-
-  tags = {
-    Name = "AWS-private2-RT"
-  }
-}
-
-resource "aws_route_table_association" "private2_association" {
-  subnet_id      = aws_subnet.private2.id
-  route_table_id = aws_route_table.private2_rt.id
-}
-
-
-
-resource "aws_route_table" "private_db_rt" {
+resource "aws_route_table" "db" {
   vpc_id = aws_vpc.main.id
 
   tags = {
@@ -149,14 +113,10 @@ resource "aws_route_table" "private_db_rt" {
   }
 }
 
-resource "aws_route_table_association" "private3_association" {
-  subnet_id      = aws_subnet.private3.id
-  route_table_id = aws_route_table.private_db_rt.id
-}
-
-resource "aws_route_table_association" "private4_association" {
-  subnet_id      = aws_subnet.private4.id
-  route_table_id = aws_route_table.private_db_rt.id
+resource "aws_route_table_association" "db_association" {
+  count = var.subnets_count
+  subnet_id      = aws_subnet.db[count.index].id
+  route_table_id = aws_route_table.db.id
 }
 
 
@@ -165,35 +125,22 @@ resource "aws_route_table_association" "private4_association" {
 ######################################
 
 # Elastic IP 생성 (NAT Gateway용)
-resource "aws_eip" "nat_eip1" {
-  tags = {
-    Name = "AWS-NAT-EIP1"
-  }
-}
+resource "aws_eip" "nat_eip" {
+  count = var.subnets_count
 
-resource "aws_eip" "nat_eip2" {
   tags = {
-    Name = "AWS-NAT-EIP2"
+    Name = "AWS-NAT-EIP${count.index + 1}"
   }
 }
 
 # NAT Gateway 생성 (Private RT용)
-resource "aws_nat_gateway" "nat_gw1" {
-  allocation_id = aws_eip.nat_eip1.id
-  subnet_id     = aws_subnet.public1.id
+resource "aws_nat_gateway" "nat_gw" {
+  count = var.subnets_count
+  allocation_id = aws_eip.nat_eip[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
 
   tags = {
-    Name = "AWS-NAT-GW1"
-  }
-}
-
-# NAT Gateway 생성 (Private2 RT용)
-resource "aws_nat_gateway" "nat_gw2" {
-  allocation_id = aws_eip.nat_eip2.id
-  subnet_id     = aws_subnet.public2.id
-
-  tags = {
-    Name = "AWS-NAT-GW2"
+    Name = "AWS-NAT-GW${count.index + 1}"
   }
 }
 
@@ -203,18 +150,11 @@ resource "aws_nat_gateway" "nat_gw2" {
 
 # Private RT에 NAT Gateway 연결
 resource "aws_route" "private_rt_nat_route" {
-  route_table_id         = aws_route_table.private_rt.id
+  count = var.subnets_count
+  route_table_id         = aws_route_table.private[count.index].id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.nat_gw1.id
+  nat_gateway_id         = aws_nat_gateway.nat_gw[count.index].id
 }
-
-# Private2 RT에 NAT Gateway 연결
-resource "aws_route" "private2_rt_nat_route" {
-  route_table_id         = aws_route_table.private2_rt.id
-  destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = aws_nat_gateway.nat_gw2.id
-}
-
 
 ######################################
 # EKS 클러스터 생성 (Auto Mode 활성화)
@@ -225,6 +165,12 @@ module "eks" {
 
   cluster_name    = "AWS-cluster"
   cluster_version = "1.31"
+
+  bootstrap_self_managed_addons = false
+
+  cluster_addons = {
+    metrics-server = {}
+  }
 
   # Cluster endpoint public access 설정
   cluster_endpoint_public_access = true
@@ -250,9 +196,3 @@ module "eks" {
     Terraform   = "true"
   }
 }
-
-
-
-
-
-
