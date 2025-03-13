@@ -157,6 +157,83 @@ resource "aws_route" "private_rt_nat_route" {
 }
 
 ######################################
+# VPN 설정
+######################################
+
+# VPN Gateway 생성
+resource "aws_vpn_gateway" "aws_vpn_gw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "On-premise-VPNGW"
+  }
+}
+
+# VPN 고객 게이트웨이 생성
+resource "aws_customer_gateway" "on_premise" {
+  bgp_asn    = 65000
+  ip_address = var.on_premise_public_ip
+  type       = "ipsec.1"
+
+  tags = {
+    Name = "On-premise-CGW"
+  }
+}
+
+# VPN 연결 설정
+resource "aws_vpn_connection" "aws_on_premise" {
+  vpn_gateway_id      = aws_vpn_gateway.aws_vpn_gw.id
+  customer_gateway_id = aws_customer_gateway.on_premise.id
+  type                = "ipsec.1"
+  static_routes_only  = true
+
+  tags = {
+    Name = "On-premise-VPN-CON"
+  }
+}
+
+resource "aws_vpn_connection_route" "on_premise" {
+  destination_cidr_block = var.on_premise_cidr_block
+  vpn_connection_id      = aws_vpn_connection.aws_on_premise.id
+}
+
+locals {
+  route_table_ids = concat(aws_route_table.public[*].id, aws_route_table.private[*].id, aws_route_table.db[*].id)
+}
+
+resource "aws_vpn_gateway_route_propagation" "vpn" {
+  count = length(local.route_table_ids)
+  vpn_gateway_id = aws_vpn_gateway.aws_vpn_gw.id
+  route_table_id = local.route_table_ids[count.index]
+}
+
+######################################
+# EKS 보안그룹 생성
+######################################
+
+resource "aws_security_group" "allow_on_premise" {
+  name        = "allow_on_premise"
+  description = "Allow all inbound traffic and all outbound traffic from on-premise"
+  vpc_id      = aws_vpc.main.id
+
+  tags = {
+    Name = "allow_on_premise"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_on_premise" {
+  security_group_id = aws_security_group.allow_on_premise.id
+  cidr_ipv4         = var.on_premise_cidr_block
+  ip_protocol       = "-1"
+}
+
+resource "aws_vpc_security_group_egress_rule" "allow_on_premise" {
+  security_group_id = aws_security_group.allow_on_premise.id
+  cidr_ipv4         = var.on_premise_cidr_block
+  ip_protocol       = "-1"
+}
+
+######################################
 # EKS 클러스터 생성 (Auto Mode 활성화)
 ######################################
 module "eks" {
@@ -186,10 +263,9 @@ module "eks" {
 
   # VPC 및 서브넷 연결
   vpc_id     = aws_vpc.main.id
-  subnet_ids = [
-    aws_subnet.private1.id,
-    aws_subnet.private2.id
-  ]
+  subnet_ids = aws_subnet.private[*].id
+
+  cluster_additional_security_group_ids = [aws_security_group.allow_on_premise.id]
 
   tags = {
     Environment = "dev"
