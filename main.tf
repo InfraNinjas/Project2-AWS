@@ -12,6 +12,32 @@ resource "aws_vpc" "main" {
   }
 }
 
+######################################
+# Route53 프라이빗 호스팅 존 생성
+######################################
+
+# Route53 프라이빗 존 생성
+resource "aws_route53_zone" "int_dns" {
+  name = "${var.ocp_cluster_name}.${var.ocp_domain_name}"
+  vpc {
+    vpc_id     = aws_vpc.main.id
+    vpc_region = "ap-northeast-2"
+  }
+
+  tags = {
+    Name = "${var.ocp_domain_name}"
+  }
+}
+
+# Internal APPS DNS 레코드 생성
+resource "aws_route53_record" "internal_api_server_record_api" {
+  zone_id = aws_route53_zone.int_dns.zone_id
+  name    = "*.apps.${var.ocp_cluster_name}.${var.ocp_domain_name}"
+
+  type    = "A"
+  ttl     = 300
+  records = [var.ocp_lb_ip]
+}
 
 ######################################
 # Private , Public 서브넷 구성
@@ -22,19 +48,19 @@ data "aws_availability_zones" "available" {
 }
 
 resource "aws_subnet" "public" {
-  count = var.subnets_count
+  count                   = var.subnets_count
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.10.${count.index + 1}0.0/24"
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = true
   tags = {
-    Name = "AWS-public${count.index + 1}-SN"
+    Name                     = "AWS-public${count.index + 1}-SN"
     "kubernetes.io/role/elb" = 1
   }
 }
 
 resource "aws_subnet" "private" {
-  count = var.subnets_count
+  count             = var.subnets_count
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.10.1${count.index + 1}0.0/24"
   availability_zone = data.aws_availability_zones.available.names[count.index]
@@ -44,7 +70,7 @@ resource "aws_subnet" "private" {
 }
 
 resource "aws_subnet" "db" {
-  count = var.subnets_count
+  count             = var.subnets_count
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.10.2${count.index + 1}0.0/24"
   availability_zone = data.aws_availability_zones.available.names[count.index]
@@ -82,7 +108,7 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public1_association" {
-  count = var.subnets_count
+  count          = var.subnets_count
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
@@ -91,7 +117,7 @@ resource "aws_route_table_association" "public1_association" {
 # 라우팅 테이블 생성 (Private)
 ######################################
 resource "aws_route_table" "private" {
-  count = var.subnets_count
+  count  = var.subnets_count
   vpc_id = aws_vpc.main.id
 
   tags = {
@@ -99,7 +125,7 @@ resource "aws_route_table" "private" {
   }
 }
 resource "aws_route_table_association" "private_association" {
-  count = var.subnets_count
+  count          = var.subnets_count
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[count.index].id
 }
@@ -114,7 +140,7 @@ resource "aws_route_table" "db" {
 }
 
 resource "aws_route_table_association" "db_association" {
-  count = var.subnets_count
+  count          = var.subnets_count
   subnet_id      = aws_subnet.db[count.index].id
   route_table_id = aws_route_table.db.id
 }
@@ -135,7 +161,7 @@ resource "aws_eip" "nat_eip" {
 
 # NAT Gateway 생성 (Private RT용)
 resource "aws_nat_gateway" "nat_gw" {
-  count = var.subnets_count
+  count         = var.subnets_count
   allocation_id = aws_eip.nat_eip[count.index].id
   subnet_id     = aws_subnet.public[count.index].id
 
@@ -150,7 +176,7 @@ resource "aws_nat_gateway" "nat_gw" {
 
 # Private RT에 NAT Gateway 연결
 resource "aws_route" "private_rt_nat_route" {
-  count = var.subnets_count
+  count                  = var.subnets_count
   route_table_id         = aws_route_table.private[count.index].id
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.nat_gw[count.index].id
@@ -202,7 +228,7 @@ locals {
 }
 
 resource "aws_vpn_gateway_route_propagation" "vpn" {
-  count = length(local.route_table_ids)
+  count          = length(local.route_table_ids)
   vpn_gateway_id = aws_vpn_gateway.aws_vpn_gw.id
   route_table_id = local.route_table_ids[count.index]
 }
