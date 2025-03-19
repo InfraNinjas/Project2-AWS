@@ -298,3 +298,112 @@ module "eks" {
     Terraform   = "true"
   }
 }
+
+######################################
+# RDS 생성
+######################################
+# 보안 그룹 생성
+resource "aws_security_group" "allow_db" {
+  name        = "allow_db"
+  description = "Allow 3306/TCP inbound traffic and all outbound traffic"
+  vpc_id      = data.aws_vpc.selected.id
+
+  tags = {
+    Name = "allow_db"
+  }
+}
+
+# vpc 보안 그룹 내부 규칙 생성
+resource "aws_vpc_security_group_ingress_rule" "allow_db" {
+  security_group_id = aws_security_group.allow_db.id
+  cidr_ipv4         = data.aws_vpc.selected.cidr_block
+  from_port         = 3306
+  ip_protocol       = "tcp"
+  to_port           = 3306
+}
+
+# vpc 보안 그룹 외부 규칙 생성
+resource "aws_vpc_security_group_egress_rule" "allow_db" {
+  security_group_id = aws_security_group.allow_db.id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+}
+
+# VPC 지정
+data "aws_vpc" "selected" {
+  id = aws_vpc.main.id
+}
+
+# db 서브넷 지정
+resource "aws_db_subnet_group" "my-db-sg" {
+  name       = "my-db-sg"
+  subnet_ids = aws_subnet.db[*].id
+
+  tags = {
+    Name = "My DB subnet group"
+  }
+}
+
+# DB 생성
+resource "aws_db_instance" "myDB" {
+  allocated_storage    = 10
+  db_name              = "webdb"
+  engine               = "mysql"
+  engine_version       = "8.0"
+  instance_class       = "db.t3.micro"
+  username             = var.db_username
+  password             = var.db_password
+  parameter_group_name = "default.mysql8.0"
+  skip_final_snapshot  = true
+
+  db_subnet_group_name = aws_db_subnet_group.my-db-sg.name
+  vpc_security_group_ids = [aws_security_group.allow_db.id]
+}
+
+######################################
+# WAF 구성
+######################################
+# waf acl 생성
+resource "aws_wafv2_web_acl" "test-waf-acl" {
+  name        = "managed-rule-test-waf-acl"
+  description = "test-waf-acl of a managed rule."
+  scope       = "REGIONAL"
+
+  default_action {
+    allow {}
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "YelbWAFAclMetrics"
+    sampled_requests_enabled   = true
+  }
+
+  rule {
+  name     = "AWSManagedRulesCommonRuleSet"
+  priority = 0
+  
+  override_action {
+    count {}
+  }
+  
+  statement {
+    managed_rule_group_statement {
+      name        = "AWSManagedRulesCommonRuleSet"
+      vendor_name = "AWS"
+    }
+  }
+  
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "AWSManagedRulesCommonRuleSet"
+    sampled_requests_enabled   = true
+  }
+}
+}
+
+# ALB 연동을 위한 추가 설정 (선택사항)
+resource "aws_wafv2_web_acl_association" "waf_alb" {
+  resource_arn = "arn:aws:elasticloadbalancing:ap-northeast-2:242201300040:loadbalancer/app/k8s-default-frontend-79328ada8f/8a5016cd85a6fb54"
+  web_acl_arn  = aws_wafv2_web_acl.test-waf-acl.arn
+}

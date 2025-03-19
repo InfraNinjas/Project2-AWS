@@ -39,3 +39,20 @@ variable "ocp_lb_ip" {
   type        = string
   default     = "192.168.20.1"
 }
+
+#
+# RDS
+#
+variable "db_username" {
+  description = "Username for Database"
+  type = string
+}
+
+variable "db_password" {
+  description = "Password for Database"
+  type = string
+}
+
+#
+# WAF
+#
