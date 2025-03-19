@@ -43,15 +43,15 @@ variable "ocp_lb_ip" {
 #
 # RDS
 #
-# variable "db_username" {
-#   description = "Username for Database"
-#   type = string
-# }
+variable "db_username" {
+  description = "Username for Database"
+  type = string
+}
 
-# variable "db_password" {
-#   description = "Password for Database"
-#   type = string
-# }
+variable "db_password" {
+  description = "Password for Database"
+  type = string
+}
 
 #
 # WAF
