@@ -10,10 +10,10 @@ variable "subnets_count" {
   default     = 2
 }
 
-# variable "on_premise_public_ip" {
-#   description = "Public ip"
-#   type        = string
-# }
+variable "on_premise_public_ip" {
+  description = "Public ip"
+  type        = string
+}
 
 variable "on_premise_cidr_block" {
   description = "On-premise CIDR block"
