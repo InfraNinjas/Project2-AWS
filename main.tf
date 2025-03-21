@@ -356,7 +356,7 @@ resource "aws_db_instance" "myDB" {
   parameter_group_name = "default.mysql8.0"
   skip_final_snapshot  = true
 
-  db_subnet_group_name = aws_db_subnet_group.my-db-sg.name
+  db_subnet_group_name   = aws_db_subnet_group.my-db-sg.name
   vpc_security_group_ids = [aws_security_group.allow_db.id]
 }
 
@@ -380,30 +380,24 @@ resource "aws_wafv2_web_acl" "test-waf-acl" {
   }
 
   rule {
-  name     = "AWSManagedRulesCommonRuleSet"
-  priority = 0
-  
-  override_action {
-    count {}
-  }
-  
-  statement {
-    managed_rule_group_statement {
-      name        = "AWSManagedRulesCommonRuleSet"
-      vendor_name = "AWS"
+    name     = "AWSManagedRulesCommonRuleSet"
+    priority = 0
+
+    override_action {
+      count {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWSManagedRulesCommonRuleSet"
+      sampled_requests_enabled   = true
     }
   }
-  
-  visibility_config {
-    cloudwatch_metrics_enabled = true
-    metric_name                = "AWSManagedRulesCommonRuleSet"
-    sampled_requests_enabled   = true
-  }
-}
-}
-
-# ALB 연동을 위한 추가 설정 (선택사항)
-resource "aws_wafv2_web_acl_association" "waf_alb" {
-  resource_arn = "arn:aws:elasticloadbalancing:ap-northeast-2:242201300040:loadbalancer/app/k8s-default-frontend-79328ada8f/8a5016cd85a6fb54"
-  web_acl_arn  = aws_wafv2_web_acl.test-waf-acl.arn
 }

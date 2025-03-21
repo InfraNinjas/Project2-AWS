@@ -45,14 +45,10 @@ variable "ocp_lb_ip" {
 #
 variable "db_username" {
   description = "Username for Database"
-  type = string
+  type        = string
 }
 
 variable "db_password" {
   description = "Password for Database"
-  type = string
+  type        = string
 }
-
-#
-# WAF
-#

@@ -21,24 +21,6 @@ output "db_address" {
 #
 # WAF
 #
-output "eks_host" {
-  value = module.eks.cluster_endpoint
-
-  depends_on = [module.eks]
-}
-
-output "eks_ca_cert" {
-  value = module.eks.cluster_certificate_authority_data
-
-  depends_on = [module.eks]
-}
-
-output "eks_name" {
-  value = module.eks.cluster_name
-
-  depends_on = [module.eks]
-}
-
-output "LB_arn" {
+output "WAF_arn" {
   value = aws_wafv2_web_acl.test-waf-acl.arn
 }
