@@ -271,6 +271,10 @@ module "eks" {
 
   bootstrap_self_managed_addons = false
 
+  cluster_upgrade_policy = {
+    support_type = "STANDARD"
+  }
+
   cluster_addons = {
     metrics-server = {}
   }
