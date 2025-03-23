@@ -29,6 +29,26 @@ resource "aws_route53_zone" "int_dns" {
   }
 }
 
+# Internal API DNS 레코드 생성
+resource "aws_route53_record" "internal_api_server_record_api" {
+  zone_id = aws_route53_zone.int_dns.zone_id
+  name    = "api.${var.ocp_cluster_name}.${var.ocp_domain_name}"
+
+  type    = "A"
+  ttl     = 300
+  records = [var.ocp_lb_ip]
+}
+
+# Internal API DNS 레코드 생성
+resource "aws_route53_record" "internal_api_server_record_api" {
+  zone_id = aws_route53_zone.int_dns.zone_id
+  name    = "api.${var.ocp_cluster_name}.${var.ocp_domain_name}"
+
+  type    = "A"
+  ttl     = 300
+  records = [var.ocp_lb_ip]
+}
+
 # Internal APPS DNS 레코드 생성
 resource "aws_route53_record" "internal_api_server_record_api" {
   zone_id = aws_route53_zone.int_dns.zone_id
@@ -351,7 +371,7 @@ resource "aws_db_subnet_group" "my-db-sg" {
 # DB 생성
 resource "aws_db_instance" "myDB" {
   allocated_storage    = 10
-  db_name              = "webdb"
+  db_name              = var.db_name
   engine               = "mysql"
   engine_version       = "8.0"
   instance_class       = "db.t3.micro"

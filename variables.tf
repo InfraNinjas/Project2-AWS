@@ -52,3 +52,8 @@ variable "db_password" {
   description = "Password for Database"
   type        = string
 }
+
+variable "db_name" {
+  description = "Name of Database"
+  type        = string
+}
