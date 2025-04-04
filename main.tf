@@ -39,18 +39,8 @@ resource "aws_route53_record" "internal_api_server_record_api" {
   records = [var.ocp_lb_ip]
 }
 
-# Internal API DNS 레코드 생성
-resource "aws_route53_record" "internal_api_server_record_api" {
-  zone_id = aws_route53_zone.int_dns.zone_id
-  name    = "api.${var.ocp_cluster_name}.${var.ocp_domain_name}"
-
-  type    = "A"
-  ttl     = 300
-  records = [var.ocp_lb_ip]
-}
-
 # Internal APPS DNS 레코드 생성
-resource "aws_route53_record" "internal_api_server_record_api" {
+resource "aws_route53_record" "internal_apps_server_record_api" {
   zone_id = aws_route53_zone.int_dns.zone_id
   name    = "*.apps.${var.ocp_cluster_name}.${var.ocp_domain_name}"
 
